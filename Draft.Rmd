@@ -1,0 +1,144 @@
+---
+title: "Draft"
+output: html_notebook
+---
+Scientific Question: In what way can age of a patient influence the outcome of brain computer-interface?
+
+BCI(Brain-computer-interface) application is computer base technique that translate the brain signal into understandable meaning. When this application completed, it will make opportunity for the patients that lack of vocal ability to express their thoughts through computer by placing electrodes on their brain surface. BCI can not only translate signals in the brain but shows strongly accuracy when it reversely performed to predict the participants' gender. The successfully reverse operation indicates there is some patterns or relationship between the participants' gender and brain-computer-interface application. 
+Recent years scientists found the age-related change in cortical activation may fundamentally influence people’s ability to use brain-computer interfaces (BCI), because large number of BCI methodologies are based on locality-dependent signal enhancement processing algorithms. It becomes interesting now to look deeper into the relationship between age factor and BCI application, and if this time BCI application can reversely predict the participants' age instead of gender. 
+
+Scientific Hypothesis: If a BCI application experiment generates the time and accuracy for participants, then we can predict ages of participants in this experiment.
+
+I'll use deep neural networks model, p-values and correlate plot for my Project 3. Within the data from https://www.sciencedirect.com/science/article/pii/S0925231217302229., we had datas of 20 participants, 10 in young group and 10 in elder group.  The data contains columns including: time in BCI application , command, age and accuracy.Before really building up the DNN model, p-values analysis will be performed to check about the raw data. Then correlate plot get used to check about the relationship of each one of columns with one another. For the Deep neural networks model, I will build up one deep neural networks model with time datasets of 20 those participants, 0.2 of them as testing group and 0.8 of them treat as training group. After finishing building up the model, I will use the test group to test on how my DNN model will output either young/ old group as outer layer and check the history of the compile model output accuracy.
+
+All the packgaes that gonna be used in this project list below:
+1.tensorflow
+2.keras
+3.dplyr
+4.tidyr
+5.corrplot
+
+Before really get to the code of this project, I needed to install those packages and import the library of them.
+For tensorflow and keras, I also needed to run the install function after importing library.
+```{r}
+##install.packages("keras")
+##install.packages("tensorflow")
+##library(tensorflow)
+##install_tensorflow()
+library(tensorflow)
+##tf$constant("Hello")
+library(keras)
+##install_keras()
+library(dplyr)
+library(tidyr)
+##install.packages("corrplot")
+library(corrplot)
+```
+
+The code below is used to load the csv file that contains 20 participants' dataoutcome of one BCI spelling application tasks. Each subject has subject, time, accuracy, ITR, command(correct, incorrect), time/correct, age). We can take a look at its structure and head data for better understanding.
+```{r}
+##local variables are defined here, downloaded from the reference mentioned in the method part.
+## the data.csv file is more a local public data that done by private lab, within all datas as collected by computers.
+age_data_raw <- read.csv("~/Downloads/Data.csv")
+
+##check the head and structure of this file.
+head(age_data_raw)
+str(age_data_raw)
+
+class(age_data_raw$Age)
+## I assigned the catergory Age to factor since it's our target to look at.Our main goal is to use two age groups of people to build DNN and test it to predict more ages. In this way, we can more easily separate the subjects into two age groups with age as factor instead of finding all subject has sepacific string in their age column.
+
+age_data_raw$Age <- as.factor(age_data_raw$Age)
+class(age_data_raw$Age)
+## ensure age is as factor now.
+
+##Take a try on one pair of datas, time and time/command correct numbers,  that I thought would be highly related with each other in positively way.I plot them as x and y within a basic plotting function, and for different age groups, I colored them with two different colors red and blue to show the difference existing already.
+plot(age_data_raw$Time,
+     age_data_raw$Time.Ccorrect ,
+     pch =10, bg = c("red", "blue")[unclass(age_data_raw$Age)],
+     xlab = "Time.",
+     ylab = "Time.Ccorrect ")
+```
+Now, file got loaded into Rstudio and a brief view of data file performed. In the file, the first 10 subjects are young age group, and the others are elder age group. 
+::Subject column stands for the index number; Time stands for the total time for BCI system to function in the spelling task; acc. stands for accuracy of the BCI application outputs; ITR stands for the information Transfer Rate of BCI operation; Ccommand, Cright, Cfalse each stands for the total commands BCI system output with, the times of BCI application oupts  with correct command and incorrect one; Time.Ccorrect stands for the slope that is actually Time/ccorrect number; and the last factor column is the age group the participants belong to.
+
+The next two lines I will perform corrplot with the package(corrplot). This will shows all the relationship between one another. Subject index and Age are two independent columns, so I excluded them.  
+
+```{r}
+##create function that intake our datas to perform a relationship analysis.
+M <- cor(age_data_raw[,2:8])
+##cor() function can help us generate relationships of datas
+
+##corrplot will intake all the relationships and correlations, in this time, I used color as the plotting style. If two variables encounter in a red block, that means they are negatively correlate, and if they encounter in a blue block, they are positive correlate. The lighter the color is, the slope is more approaching y= x for two variables.
+corrplot(M, method = "color")
+##
+```
+
+Next, after the code before give an analysis for the different columns, now I will start to prepare for my deep neural networks models.
+
+```{r}
+## set seed helped to randomize number.Then the data need to be separated into two samples, one belongs to the training sample where gonna use to build deep neural networks, and one belongs to testing group that I will use to test on accuracy. The ratio for those two groups are 0.5 and 0.5 since we have two halves age groups
+set.seed(100)
+ind <- sample(2, nrow(age_data_raw), replace = TRUE, prob = c(0.5, 0.5))
+
+##The codes below are all doing the spliting function since we have two new assigned groups right now, one for training and one for testing. 
+## Those two codes below were used to split the datas from column 2 to 8, which was 
+age_data_training <- age_data_raw[ind == 1, 2:8]
+age_data_test <- age_data_raw[ind == 2, 2:8]
+
+age_trainingtarget <- age_data_raw[ind == 1, 9]
+age_testtarget <- age_data_raw[ind == 2, 9]
+age_trainingtarget
+age.trainLabels <- to_categorical(age_data_training)
+age.testLabels <- to_categorical(age_data_test)
+```
+
+
+
+
+```{r}
+print(age.testLabels)
+# Initialize a sequential model
+model <- keras_model_sequential() 
+
+# Add layers to the model
+model %>% 
+  layer_dense(units = 5, activation = 'relu', input_shape = c(8)) %>% 
+  layer_dense(units = 2, activation = 'softmax')
+
+summary(model)
+
+# Get model configuration
+get_config(model)
+
+# Get layer configuration
+get_layer(model, index = 1)
+
+# List the model's layers
+model$layers
+
+# List the input tensors
+model$inputs
+
+# List the output tensors
+model$outputs
+
+model %>% compile(
+  loss = 'categorical_crossentropy',
+  optimizer = 'adam',
+  metrics = 'accuracy'
+)
+dim(age_data_training)
+model %>% fit(
+  age_data_training, 
+  iris.trainLabels, 
+  epochs = 20, 
+  batch_size = 4, 
+  validation_split = 0.5
+)
+
+```
+Analysis:
+Although the 
+
+
