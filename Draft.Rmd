@@ -33,6 +33,7 @@ library(dplyr)
 library(tidyr)
 ##install.packages("corrplot")
 library(corrplot)
+library(reticulate)
 ```
 
 The code below is used to load the csv file that contains 20 participants' dataoutcome of one BCI spelling application tasks. Each subject has subject, time, accuracy, ITR, command(correct, incorrect), time/correct, age). We can take a look at its structure and head data for better understanding.
@@ -66,12 +67,30 @@ The next two lines I will perform corrplot with the package(corrplot). This will
 
 ```{r}
 ##create function that intake our datas to perform a relationship analysis.
+
+
 M <- cor(age_data_raw[,2:8])
 ##cor() function can help us generate relationships of datas
 
 ##corrplot will intake all the relationships and correlations, in this time, I used color as the plotting style. If two variables encounter in a red block, that means they are negatively correlate, and if they encounter in a blue block, they are positive correlate. The lighter the color is, the slope is more approaching y= x for two variables.
 corrplot(M, method = "color")
 ##
+```
+Then, we can use correlation rate and its p-value to look closer on the dark or light color on the plotting map.
+
+```{r}
+## For cor and p-value analysis, I choose two pairs with the darkest red/ blue, and two with the lightest red/blue.
+##lightest blue
+cor.test(age_data_raw$Ccorrect, age_data_raw$Time.Ccorrect)
+##darkest blue
+cor.test(age_data_raw$Time.Ccorrect, age_data_raw$Time)
+## darkest red
+cor.test(age_data_raw$Acc., age_data_raw$Cfalse)
+## lightest red
+cor.test(age_data_raw$ITR, age_data_raw$Ccorrect)
+## In this 4 correlation test with p-value test, the negative and positive mark stands for if the relationship between two variables is negative(one decrease while another increase) or positive. At the same time the bigger the absolute value of correlation score is , the high the correlation is(the slope is farther away from y= x)
+## The p-value in correction represents the probability that the correlation between x and y in the sample data occurred by chance. In those 4 calculations, all of every correlation are  less 0.05, which show there are less than 0.05 chance that results from our sample occurred due to chance. But as the darkness of the color gets lighter, the bigger  p-value will get to be. It shows that the when high er correlation between two values will results in less probability for one and another to correlate. The code below shows about the corrlation idea and how it matches with the ploting method.  
+
 ```
 
 Next, after the code before give an analysis for the different columns, now I will start to prepare for my deep neural networks models.
@@ -81,33 +100,43 @@ Next, after the code before give an analysis for the different columns, now I wi
 set.seed(100)
 ind <- sample(2, nrow(age_data_raw), replace = TRUE, prob = c(0.5, 0.5))
 
-##The codes below are all doing the spliting function since we have two new assigned groups right now, one for training and one for testing. 
-## Those two codes below were used to split the datas from column 2 to 8, which was 
+##The codes below are all doing the splitting function since we have two new assigned groups right now, one for training and one for testing. 
+## Those two codes below were used to split the data from column 2 to 8, which was all the numeric data that we could use for building DNN layers.Here I identify the training data as 1 for ind and I identify test set as 2.
 age_data_training <- age_data_raw[ind == 1, 2:8]
 age_data_test <- age_data_raw[ind == 2, 2:8]
 
+## The following two line is used for only splitting the class column, which is the age group columns. As the same as the last two lines, we assign 1 to training and 2 to test. This time, the two variable named target since they are the column factors we're most focusing on.
 age_trainingtarget <- age_data_raw[ind == 1, 9]
 age_testtarget <- age_data_raw[ind == 2, 9]
-age_trainingtarget
-age.trainLabels <- to_categorical(age_data_training)
-age.testLabels <- to_categorical(age_data_test)
+
+age_trainingtarget <-as.numeric(age_trainingtarget)
+
+age.trainLabels <- to_categorical(age_trainingtarget)
+age_testtarget<- as.numeric(age_testtarget)
+age.testLabels <- to_categorical(age_testtarget)
+```
+
+
+
+Right now I set up all the variables that a deep neural network needed and it's time to initialize the model and add layer to it. 
+```{r}
+print(age.testLabels)
+# Now Initialize a sequential model, I needed to use the keras package for the following command. 
+model <- keras_model_sequential() 
+
+# Add layers to the model
+model %>% 
+  layer_dense(units = 12, activation = 'relu', input_shape = c(8)) %>% 
+  layer_dense(units = 2, activation = 'softmax')
+
+summary(model)
 ```
 
 
 
 
+
 ```{r}
-print(age.testLabels)
-# Initialize a sequential model
-model <- keras_model_sequential() 
-
-# Add layers to the model
-model %>% 
-  layer_dense(units = 5, activation = 'relu', input_shape = c(8)) %>% 
-  layer_dense(units = 2, activation = 'softmax')
-
-summary(model)
-
 # Get model configuration
 get_config(model)
 
@@ -122,22 +151,44 @@ model$inputs
 
 # List the output tensors
 model$outputs
+```
 
+
+```{r}
 model %>% compile(
   loss = 'categorical_crossentropy',
   optimizer = 'adam',
   metrics = 'accuracy'
 )
+b <- data.frame(age_data_raw[,2:8])
+validation_split(b, prop= .5)
 dim(age_data_training)
 model %>% fit(
   age_data_training, 
-  iris.trainLabels, 
+  age.trainLabels, 
   epochs = 20, 
-  batch_size = 4, 
+  batch_size = 5, 
   validation_split = 0.5
 )
 
 ```
+
+```{r}
+history <-model %>% fit(
+  age_data_training, 
+  age.trainLabels, 
+  epochs = 8, 
+  batch_size = 20, 
+  validation_split = 0.5
+)
+
+```
+
+```{r}
+plot
+```
+
+
 Analysis:
 Although the 
 
